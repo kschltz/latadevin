@@ -1,0 +1,274 @@
+{:paths ["src" "scripts"]
+ :pods {huahaiy/datalevin {:version "0.10.7"}}
+ :tasks
+ {;; ── Datalog Store ──────────────────────────────────────────────
+
+  create
+  {:doc "Create a Datalog DB with schema. Usage: bb create <db-path> <schema-edn-file>"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path schema-file] *command-line-args*]
+             (when-not (and db-path schema-file)
+               (println "Usage: bb create <db-path> <schema-edn-file>")
+               (System/exit 1))
+             (let [schema (read-string (slurp schema-file))
+                   conn   ((resolve 'd/get-conn) db-path schema)]
+               (println "Created database at" db-path "with schema:")
+               (prn schema)
+               ((resolve 'd/close) conn))))}
+
+  transact
+  {:doc "Transact data into a Datalog DB. Usage: bb transact <db-path> <data-edn-file>"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path data-file] *command-line-args*]
+             (when-not (and db-path data-file)
+               (println "Usage: bb transact <db-path> <data-edn-file>")
+               (System/exit 1))
+             (let [data (read-string (slurp data-file))
+                   conn ((resolve 'd/get-conn) db-path)]
+               (let [report ((resolve 'd/transact!) conn data)]
+                 (println "Transacted" (count (:tx-data report)) "datoms"))
+               ((resolve 'd/close) conn))))}
+
+  query
+  {:doc "Run a Datalog query. Usage: bb query <db-path> '<query>' [<args>...]"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path query-str & args] *command-line-args*]
+             (when-not (and db-path query-str)
+               (println "Usage: bb query <db-path> '<query>' [<args>...]")
+               (System/exit 1))
+             (let [query (read-string query-str)
+                   conn  ((resolve 'd/get-conn) db-path)
+                   db    ((resolve 'd/db) conn)
+                   edn-args (map read-string args)
+                   result (apply (resolve 'd/q) query db edn-args)]
+               (prn result)
+               ((resolve 'd/close) conn))))}
+
+  pull
+  {:doc "Pull entity by lookup ref or eid. Usage: bb pull <db-path> '<pattern>' '<id>'"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path pattern-str id-str] *command-line-args*]
+             (when-not (and db-path pattern-str id-str)
+               (println "Usage: bb pull <db-path> '<pattern>' '<id>'")
+               (println "  pattern: '[*]' or '[:name :age]'")
+               (println "  id: entity id (number) or lookup ref '[:name \"Alice\"]'")
+               (System/exit 1))
+             (let [pattern (read-string pattern-str)
+                   id      (read-string id-str)
+                   conn    ((resolve 'd/get-conn) db-path)
+                   result  ((resolve 'd/pull) ((resolve 'd/db) conn) pattern id)]
+               (prn result)
+               ((resolve 'd/close) conn))))}
+
+  datoms
+  {:doc "List raw datoms. Usage: bb datoms <db-path> [index] (index: eav|aev|ave|vae)"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path idx] *command-line-args*
+                 index (keyword (or idx "eav"))]
+             (when-not db-path
+               (println "Usage: bb datoms <db-path> [index]")
+               (System/exit 1))
+             (let [conn ((resolve 'd/get-conn) db-path)]
+               (doseq [d ((resolve 'd/datoms) ((resolve 'd/db) conn) index)]
+                 (prn d))
+               ((resolve 'd/close) conn))))}
+
+  schema
+  {:doc "Show the schema of a Datalog DB. Usage: bb schema <db-path>"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path] *command-line-args*]
+             (when-not db-path
+               (println "Usage: bb schema <db-path>")
+               (System/exit 1))
+             (let [conn ((resolve 'd/get-conn) db-path)]
+               ;; schema fn returns nil via pod, dump via dtlv instead
+               (let [datoms ((resolve 'd/datoms) ((resolve 'd/db) conn) :eav)
+                     attrs  (into (sorted-set) (map second datoms))]
+                 (println "Attributes:" attrs)
+                 (println "Entity count:" ((resolve 'd/max-eid) ((resolve 'd/db) conn))))
+               ((resolve 'd/close) conn))))}
+
+  stats
+  {:doc "Show DB stats. Usage: bb stats <db-path>"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path] *command-line-args*]
+             (when-not db-path
+               (println "Usage: bb stats <db-path>")
+               (System/exit 1))
+             (let [conn ((resolve 'd/get-conn) db-path)
+                   db   ((resolve 'd/db) conn)]
+               (println "Max entity ID:" ((resolve 'd/max-eid) db))
+               (println "Datom count:" (count ((resolve 'd/datoms) db :eav)))
+               ((resolve 'd/close) conn))))}
+
+  ;; ── Key-Value Store ────────────────────────────────────────────
+
+  kv-put
+  {:doc "Put key-value pairs. Usage: bb kv-put <db-path> <table> <key> <value-edn>"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path table k v-str] *command-line-args*]
+             (when-not (and db-path table k v-str)
+               (println "Usage: bb kv-put <db-path> <table> <key> <value-edn>")
+               (System/exit 1))
+             (let [db ((resolve 'd/open-kv) db-path)
+                   v  (read-string v-str)]
+               ((resolve 'd/open-dbi) db table)
+               ((resolve 'd/transact-kv) db [[:put table k v]])
+               (println "OK")
+               ((resolve 'd/close-kv) db))))}
+
+  kv-get
+  {:doc "Get a value by key. Usage: bb kv-get <db-path> <table> <key>"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path table k] *command-line-args*]
+             (when-not (and db-path table k)
+               (println "Usage: bb kv-get <db-path> <table> <key>")
+               (System/exit 1))
+             (let [db ((resolve 'd/open-kv) db-path)]
+               ((resolve 'd/open-dbi) db table)
+               (prn ((resolve 'd/get-value) db table k))
+               ((resolve 'd/close-kv) db))))}
+
+  kv-range
+  {:doc "Range query on KV table. Usage: bb kv-range <db-path> <table> [range-spec]"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path table range-str] *command-line-args*
+                 range-spec (if range-str (read-string range-str) [:all])]
+             (when-not (and db-path table)
+               (println "Usage: bb kv-range <db-path> <table> '[range-spec]'")
+               (println "  range-spec: [:all] [:at-least k] [:closed k1 k2] etc.")
+               (System/exit 1))
+             (let [db ((resolve 'd/open-kv) db-path)]
+               ((resolve 'd/open-dbi) db table)
+               (doseq [pair ((resolve 'd/get-range) db table range-spec)]
+                 (prn pair))
+               ((resolve 'd/close-kv) db))))}
+
+  kv-del
+  {:doc "Delete a key. Usage: bb kv-del <db-path> <table> <key>"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path table k] *command-line-args*]
+             (when-not (and db-path table k)
+               (println "Usage: bb kv-del <db-path> <table> <key>")
+               (System/exit 1))
+             (let [db ((resolve 'd/open-kv) db-path)]
+               ((resolve 'd/open-dbi) db table)
+               ((resolve 'd/transact-kv) db [[:del table k]])
+               (println "Deleted" k)
+               ((resolve 'd/close-kv) db))))}
+
+  kv-tables
+  {:doc "List KV sub-database tables. Usage: bb kv-tables <db-path>"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path] *command-line-args*]
+             (when-not db-path
+               (println "Usage: bb kv-tables <db-path>")
+               (System/exit 1))
+             (let [db ((resolve 'd/open-kv) db-path)]
+               (doseq [t ((resolve 'd/list-dbis) db)]
+                 (println t))
+               ((resolve 'd/close-kv) db))))}
+
+  ;; ── Knowledge Base ──────────────────────────────────────────────
+
+  kb-store
+  {:doc "Store a note. Usage: bb kb-store --parent <summary> <topic> <content> [tags...]"
+   :task (apply shell "bb" "scripts/kb.clj" "store" *command-line-args*)}
+
+  kb-abstract
+  {:doc "Create a top-level abstract. Usage: bb kb-abstract <topic> <content>"
+   :task (apply shell "bb" "scripts/kb.clj" "abstract" *command-line-args*)}
+
+  kb-summary
+  {:doc "Create a summary under an abstract. Usage: bb kb-summary <topic> <content> <parent-abstract>"
+   :task (apply shell "bb" "scripts/kb.clj" "summary" *command-line-args*)}
+
+  kb-recall
+  {:doc "Search knowledge base. Usage: bb kb-recall <query>"
+   :task (apply shell "bb" "scripts/kb.clj" "recall" *command-line-args*)}
+
+  kb-recall-multi
+  {:doc "Search multiple keywords (single invocation). Usage: bb kb-recall-multi <word1> [word2...]"
+   :task (apply shell "bb" "scripts/kb.clj" "recall-multi" *command-line-args*)}
+
+  kb-get
+  {:doc "Get exact topic. Usage: bb kb-get <topic>"
+   :task (apply shell "bb" "scripts/kb.clj" "get" *command-line-args*)}
+
+  kb-list
+  {:doc "List recent knowledge entries. Usage: bb kb-list [limit]"
+   :task (apply shell "bb" "scripts/kb.clj" "list" *command-line-args*)}
+
+  kb-tree
+  {:doc "Print knowledge base hierarchy."
+   :task (shell "bb" "scripts/kb.clj" "tree")}
+
+  kb-drill
+  {:doc "Show entry and all children. Usage: bb kb-drill <topic>"
+   :task (apply shell "bb" "scripts/kb.clj" "drill" *command-line-args*)}
+
+  kb-forget
+  {:doc "Remove a knowledge entry (must have no children). Usage: bb kb-forget <topic>"
+   :task (apply shell "bb" "scripts/kb.clj" "forget" *command-line-args*)}
+
+  kb-tags
+  {:doc "List all tags with counts."
+   :task (shell "bb" "scripts/kb.clj" "tags")}
+
+  kb-by-tag
+  {:doc "Find entries by tag. Usage: bb kb-by-tag <tag>"
+   :task (apply shell "bb" "scripts/kb.clj" "by-tag" *command-line-args*)}
+
+  ;; ── Search ─────────────────────────────────────────────────────
+
+  search
+  {:doc "Full-text search on a Datalog DB. Usage: bb search <db-path> '<query-string>'"
+   :requires ([babashka.pods :as pods])
+   :task (do
+           (pods/load-pod "dtlv")
+           (require '[pod.huahaiy.datalevin :as d])
+           (let [[db-path query-str] *command-line-args*]
+             (when-not (and db-path query-str)
+               (println "Usage: bb search <db-path> '<query-string>'")
+               (System/exit 1))
+             (let [conn ((resolve 'd/get-conn) db-path)
+                   engine ((resolve 'd/new-search-engine) db-path)]
+               (doseq [result ((resolve 'd/search) engine query-str)]
+                 (prn result))
+               ((resolve 'd/close) conn))))}}}

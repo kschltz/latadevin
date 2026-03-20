@@ -1,0 +1,5 @@
+# Claude Code project settings (personal permissions/hooks)
+.claude/settings.local.json
+
+# Example scripts
+scripts/example_query.clj
