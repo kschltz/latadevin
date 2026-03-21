@@ -1,16 +1,16 @@
-# Claude Code Knowledge Base
+# Datalevin Knowledge Base
 
-A local, persistent knowledge base for [Claude Code](https://claude.com/claude-code) backed by [Datalevin](https://github.com/juji-io/datalevin) — a fast, embedded Datalog database.
+A local, persistent knowledge base for coding agents backed by [Datalevin](https://github.com/juji-io/datalevin) — a fast, embedded Datalog database.
 
-Claude Code's built-in memory is flat key-value pairs. This gives you a **hierarchical Zettelkasten** that Claude can search, browse, and build up over time across conversations. An auto-recall hook surfaces relevant knowledge on every prompt without you doing anything.
+Coding agents typically have flat or session-limited memory. This gives you a **hierarchical Zettelkasten** that any agent can search, browse, and build up over time across sessions. An auto-recall hook (where supported) surfaces relevant knowledge on every prompt without you doing anything.
 
 ## What it does
 
 - **Stores knowledge** in a 3-layer hierarchy: abstracts (domains) > summaries (subfields) > notes (atomic facts)
-- **Auto-recalls** relevant entries on every prompt via a Claude Code hook
+- **Auto-recalls** relevant entries on every prompt via an agent hook (Claude Code supported; extensible to others)
 - **Full-text search** across topics, content, and tags
-- **Works from any project** — the database lives in `~/.claude/datalevin-kb`, not in your repo
-- **Survives context compression** — knowledge persists across conversations in a real database, not in the context window
+- **Works from any project** — the database lives in `~/.local/share/datalevin-kb`, not in your repo
+- **Survives context compression** — knowledge persists across sessions in a real database, not in the context window
 
 ## Prerequisites
 
@@ -27,18 +27,25 @@ dtlv --version  # should show 0.10.7
 ## Install
 
 ```bash
-git clone <this-repo> ~/claude-kb
-cd ~/claude-kb
+git clone <this-repo> ~/datalevin-kb
+cd ~/datalevin-kb
 ./install.sh
+```
+
+The installer defaults to Claude Code. To install for a specific agent:
+
+```bash
+./install.sh claude-code   # Claude Code (default)
+./install.sh <agent>       # Other agents (see integrations/)
 ```
 
 The install script will:
 1. Check that `bb` and `dtlv` are installed
-2. Create the database at `~/.claude/datalevin-kb`
-3. Install the auto-recall hook into your Claude Code settings
-4. Add `bb` permissions so Claude can use the KB commands
+2. Create the database at `~/.local/share/datalevin-kb`
+3. Install the auto-recall hook into your agent's settings
+4. Add `bb` permissions so the agent can use the KB commands
 
-After installing, restart Claude Code (or start a new session) for the hook to take effect.
+After installing, restart your agent (or start a new session) for the hook to take effect.
 
 ## Usage
 
@@ -65,13 +72,15 @@ bb kb-store --parent "summary/my-group" "arch/my-note" "The actual content." tag
 bb kb-forget "arch/my-note"       # Must have no children
 ```
 
-### From Claude Code
+### From your coding agent
 
-Claude reads the `CLAUDE.md` file and knows how to use all the KB commands. You can:
+The agent reads `CLAUDE.md` (Claude Code) or `KNOWLEDGEBASE.md` and knows how to use all the KB commands. You can:
 
-- Ask Claude to store what it learns: *"store that in the knowledge base"*
+- Ask the agent to store what it learns: *"store that in the knowledge base"*
 - Search explicitly: *"check the knowledge base for auth middleware"*
 - The auto-recall hook automatically searches on every prompt — relevant entries appear as context
+
+See `KNOWLEDGEBASE.md` for the complete guide.
 
 ## How it works
 
@@ -85,10 +94,10 @@ Claude reads the `CLAUDE.md` file and knows how to use all the KB commands. You 
 
 ### Auto-recall hook
 
-The install script configures a `UserPromptSubmit` hook that:
+Where supported, the install script configures a hook that:
 1. Extracts keywords from your prompt
 2. Runs a cascading search (abstracts > summaries > notes)
-3. Injects matching entries as `<knowledge-base-context>` that Claude sees
+3. Injects matching entries as context that the agent sees
 
 This is passive — it adds ~0-2 seconds per prompt and only injects when there are matches.
 
@@ -111,18 +120,28 @@ Notes use prefixed topic IDs for easy navigation:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CLAUDE_KB_PATH` | `~/.claude/datalevin-kb` | Database location |
-| `CLAUDE_KB_DIR` | `~/claude-kb` | Where this repo is cloned (used by the hook) |
+| `DATALEVIN_KB_PATH` | `~/.local/share/datalevin-kb` | Database location |
+| `CLAUDE_KB_PATH` | — | Legacy alias (still supported) |
+
+## Supported Agents
+
+| Agent | Integration | Auto-recall hook |
+|-------|-------------|-----------------|
+| Claude Code | `integrations/claude-code/` | Yes (`UserPromptSubmit`) |
+
+To add a new agent, see `integrations/README.md`.
 
 ## Uninstall
 
-Remove the hook entry from your Claude Code settings and delete the database:
+Remove the hook entry from your agent's settings and delete the database:
 
 ```bash
+rm -rf ~/.local/share/datalevin-kb
+# or if using legacy path:
 rm -rf ~/.claude/datalevin-kb
 ```
 
-The hook is in either `.claude/settings.local.json` (project-level) or `~/.claude/settings.json` (global). Look for the `UserPromptSubmit` hook referencing `kb-recall.sh`.
+For Claude Code: remove the `UserPromptSubmit` hook referencing `kb-recall.sh` from `~/.claude/settings.json`.
 
 ## Also included
 

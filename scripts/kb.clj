@@ -1,6 +1,6 @@
 #!/usr/bin/env bb
 
-;; Knowledge Base for Claude Code backed by Datalevin
+;; Knowledge Base backed by Datalevin
 ;; Usage: bb scripts/kb.clj <command> [args...]
 ;;
 ;; Commands:
@@ -22,8 +22,11 @@
 (pods/load-pod "dtlv")
 (require '[pod.huahaiy.datalevin :as d])
 
-(def db-path (or (System/getenv "CLAUDE_KB_PATH")
-                 (str (System/getenv "HOME") "/.claude/datalevin-kb")))
+(def db-path (or (System/getenv "DATALEVIN_KB_PATH")
+                 (System/getenv "CLAUDE_KB_PATH")
+                 (let [old (str (System/getenv "HOME") "/.claude/datalevin-kb")
+                       new (str (System/getenv "HOME") "/.local/share/datalevin-kb")]
+                   (if (.exists (java.io.File. old)) old new))))
 
 (def schema
   {:kb/topic   {:db/valueType :db.type/string :db/unique :db.unique/identity}
@@ -525,7 +528,8 @@
       (when-not (and topic content parent)
         (println "Usage: bb scripts/kb.clj store --parent <parent-summary> <topic> <content> [tags...]")
         (System/exit 1))
-      (store-note! topic content tags (System/getenv "CLAUDE_KB_SOURCE") parent))
+      (store-note! topic content tags (or (System/getenv "DATALEVIN_KB_SOURCE")
+                                          (System/getenv "CLAUDE_KB_SOURCE")) parent))
 
     "abstract"
     (let [[topic content] args]
@@ -600,7 +604,7 @@
       (by-tag tag))
 
     (do
-      (println "Datalevin Knowledge Base for Claude Code")
+      (println "Datalevin Knowledge Base")
       (println)
       (println "Commands:")
       (println "  store        --parent <summary> <topic> <content> [tags...]  Store a note")

@@ -1,4 +1,4 @@
-# Claude Code project settings (personal permissions/hooks)
+# Agent-specific project settings (personal permissions/hooks)
 .claude/settings.local.json
 
 # Example scripts
