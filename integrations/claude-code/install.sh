@@ -44,8 +44,11 @@ ok "jq $(jq --version 2>&1)"
 
 info "Initializing database..."
 
+LEGACY_DB="$HOME/.claude/datalevin-kb"
 if [ -d "$KB_DB" ]; then
   ok "Database already exists at $KB_DB"
+elif [ -d "$LEGACY_DB" ]; then
+  ok "Database already exists at $LEGACY_DB (legacy path)"
 else
   cd "$KB_DIR" && bb scripts/kb.clj list >/dev/null 2>&1
   ok "Created database at $KB_DB"
