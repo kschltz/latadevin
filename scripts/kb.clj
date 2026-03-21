@@ -604,7 +604,7 @@
       (by-tag tag))
 
     (do
-      (println "Datalevin Knowledge Base")
+      (println "Latadevin Knowledge Base")
       (println)
       (println "Commands:")
       (println "  store        --parent <summary> <topic> <content> [tags...]  Store a note")

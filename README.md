@@ -1,4 +1,4 @@
-# Datalevin Knowledge Base
+# Latadevin Knowledge Base
 
 A local, persistent knowledge base for coding agents backed by [Datalevin](https://github.com/juji-io/datalevin) — a fast, embedded Datalog database.
 
@@ -27,8 +27,8 @@ dtlv --version  # should show 0.10.7
 ## Install
 
 ```bash
-git clone <this-repo> ~/datalevin-kb
-cd ~/datalevin-kb
+git clone <this-repo> ~/latadevin-kb
+cd ~/latadevin-kb
 ./install.sh
 ```
 
@@ -44,6 +44,8 @@ The install script will:
 2. Create the database at `~/.local/share/datalevin-kb`
 3. Install the auto-recall hook into your agent's settings
 4. Add `bb` permissions so the agent can use the KB commands
+5. Install global `kb-*` commands to `~/.local/bin/` (work from any directory)
+6. Install `/kb-*` slash commands for Claude Code (`~/.claude/commands/`)
 
 After installing, restart your agent (or start a new session) for the hook to take effect.
 
@@ -51,36 +53,53 @@ After installing, restart your agent (or start a new session) for the hook to ta
 
 ### From the command line
 
+After install, commands work globally from any directory:
+
 ```bash
 # Browse
-bb kb-tree                        # Full hierarchy view
-bb kb-drill "summary/my-topic"    # Drill into a topic and its children
-bb kb-list                        # Recent entries
-bb kb-tags                        # All tags with counts
+kb-tree                           # Full hierarchy view
+kb-drill "summary/my-topic"       # Drill into a topic and its children
+kb-list                           # Recent entries
+kb-tags                           # All tags with counts
 
 # Search
-bb kb-recall "search query"       # Full-text search
-bb kb-get "arch/my-decision"      # Get specific entry
-bb kb-by-tag "architecture"       # All notes with a tag
+kb-recall "search query"          # Full-text search
+kb-get "arch/my-decision"         # Get specific entry
+kb-by-tag "architecture"          # All notes with a tag
 
 # Create
-bb kb-abstract "abstract/my-domain" "Description of this domain."
-bb kb-summary "summary/my-group" "What this group covers." "abstract/my-domain"
-bb kb-store --parent "summary/my-group" "arch/my-note" "The actual content." tag1 tag2
+kb-abstract "abstract/my-domain" "Description of this domain."
+kb-summary "summary/my-group" "What this group covers." "abstract/my-domain"
+kb-store --parent "summary/my-group" "arch/my-note" "The actual content." tag1 tag2
 
 # Delete
-bb kb-forget "arch/my-note"       # Must have no children
+kb-forget "arch/my-note"          # Must have no children
 ```
 
 ### From your coding agent
 
-The agent reads `CLAUDE.md` (Claude Code) or `KNOWLEDGEBASE.md` and knows how to use all the KB commands. You can:
+Agents read `CLAUDE.md` (Claude Code) or `AGENTS.md` (all others) and treat the KB as their primary memory. You can:
 
 - Ask the agent to store what it learns: *"store that in the knowledge base"*
 - Search explicitly: *"check the knowledge base for auth middleware"*
 - The auto-recall hook automatically searches on every prompt — relevant entries appear as context
+- In Claude Code chat, use `/kb-tree`, `/kb-recall`, etc. as slash commands
 
 See `KNOWLEDGEBASE.md` for the complete guide.
+
+### Using this KB from any project
+
+Drop the right instruction file into any project root so agents in that project treat this KB as primary:
+
+```bash
+# Claude Code
+ln -s ~/latadevin-kb/CLAUDE.md ./CLAUDE.md
+
+# All other agents (Cursor, Copilot, Gemini CLI, OpenCode, etc.)
+cp ~/latadevin-kb/AGENTS.md ./AGENTS.md
+```
+
+The global `kb-*` commands work from any directory once installed, so no path setup is needed.
 
 ## How it works
 
@@ -146,3 +165,4 @@ For Claude Code: remove the `UserPromptSubmit` hook referencing `kb-recall.sh` f
 ## Also included
 
 This project includes general-purpose Datalevin `bb` tasks (Datalog store, KV store, full-text search) that work with any Datalevin database. Run `bb tasks` to see them all, or see `guide.md` for the full reference.
+

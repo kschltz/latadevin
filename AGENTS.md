@@ -1,8 +1,8 @@
-# Latadevin Knowledge Base — Claude Code
+# Latadevin Knowledge Base
 
 > **This is your primary memory system.** Consult it before non-trivial tasks. Store what you learn after completing work.
 
-This project provides a persistent Zettelkasten knowledge base backed by Datalevin.
+This project provides a persistent, hierarchical Zettelkasten knowledge base backed by Datalevin. It works with any coding agent that can run shell commands.
 
 **Full reference**: See `KNOWLEDGEBASE.md` for the complete layer system, note conventions, all commands, and when to store/recall.
 
@@ -19,14 +19,6 @@ kb-summary "<topic>" "<content>" "<parent-abstract>"
 kb-forget "<topic>"                  # Delete (no children)
 ```
 
-Or use slash commands in Claude Code chat: `/kb-tree`, `/kb-recall`, `/kb-store`, etc.
-
-## Auto-Recall Hook
-
-A `UserPromptSubmit` hook automatically searches the knowledge base for keywords in every prompt. Relevant entries appear as `<knowledge-base-context>` in the conversation, with parent summary context included for navigation.
-
-This is passive — search explicitly with `kb-recall` when you need deeper context.
-
 ## Primary Memory Rules
 
 - **Before any non-trivial task**: run `kb-tree` for an overview, `kb-recall "<topic>"` for specifics
@@ -34,7 +26,11 @@ This is passive — search explicitly with `kb-recall` when you need deeper cont
 - Prefer KB over in-context recall for facts that span sessions
 - See `KNOWLEDGEBASE.md` for the full guide on what to store and how to structure notes
 
+## Auto-Recall
+
+If your agent supports prompt hooks, configure it to run `kb-recall` on each prompt and inject results as context. Without a hook, run `kb-recall` manually at the start of relevant tasks.
+
 ## Database Location
 
-Default: `~/.local/share/datalevin-kb` (or `~/.claude/datalevin-kb` if that exists).
+Default: `~/.local/share/datalevin-kb`.
 Override: set `DATALEVIN_KB_PATH=/your/path`.

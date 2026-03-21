@@ -1,4 +1,4 @@
-# Datalevin Knowledge Base
+# Latadevin Knowledge Base
 
 A persistent, hierarchical Zettelkasten knowledge base backed by Datalevin. Works with any coding agent that can run shell commands.
 
@@ -161,3 +161,4 @@ Override with `DATALEVIN_KB_PATH=/your/path bb kb-tree`.
 ## Other Tools
 
 This project also provides general-purpose Datalevin `bb` tasks (see `bb tasks`) for working with any Datalevin database — Datalog store, KV store, search. See `guide.md` for the full reference.
+

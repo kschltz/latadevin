@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Datalevin Knowledge Base — Installer
+# Latadevin Knowledge Base — Installer
 # Delegates to the agent-specific installer under integrations/<agent>/install.sh
 #
 # Usage:

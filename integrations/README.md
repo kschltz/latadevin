@@ -1,6 +1,6 @@
 # Agent Integrations
 
-This directory contains agent-specific installers and hooks for the Datalevin knowledge base.
+This directory contains agent-specific installers and hooks for the Latadevin knowledge base.
 
 ## Structure
 
