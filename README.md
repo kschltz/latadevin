@@ -70,7 +70,7 @@ kb-by-tag "architecture"          # All notes with a tag
 # Create
 kb-abstract "abstract/my-domain" "Description of this domain."
 kb-summary "summary/my-group" "What this group covers." "abstract/my-domain"
-kb-store --parent "summary/my-group" "arch/my-note" "The actual content." tag1 tag2
+kb-store --parent "summary/my-group" "arch/my-note" "The actual content." tag1 tag2  # content <= 1000 chars
 
 # Delete
 kb-forget "arch/my-note"          # Must have no children
@@ -121,6 +121,8 @@ Where supported, the install script configures a hook that:
 This is passive — it adds ~0-2 seconds per prompt and only injects when there are matches.
 
 ### Note conventions
+
+**Notes are hard-capped at 1000 characters.** The script rejects anything longer. If content is too large, split it into multiple notes linked with `See also:` references and shared tags.
 
 Notes use prefixed topic IDs for easy navigation:
 

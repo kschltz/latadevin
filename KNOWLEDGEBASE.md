@@ -30,7 +30,7 @@ bb kb-abstract "<topic>" "<content>"
 # Create a summary under an abstract
 bb kb-summary "<topic>" "<content>" "<parent-abstract>"
 
-# Store a note under a summary (--parent is required)
+# Store a note under a summary (--parent is required; content must be <= 1000 chars)
 bb kb-store --parent "<parent-summary>" "<topic>" "<content>" [tag1 tag2 ...]
 ```
 
@@ -64,6 +64,12 @@ The `--create-parents` flag also works with `kb-summary` to auto-create a missin
 ## Zettelkasten Note Principles
 
 Every note stored must follow these rules:
+
+### 0. Hard Size Limit: 1000 Characters
+
+**Notes are hard-capped at 1000 characters.** The script will reject anything longer with an error.
+
+If your content is too long, it **must** be split into smaller notes linked by `See also:` references and shared tags. There are no exceptions — a note that exceeds the limit is a note that should be two or more notes.
 
 ### 1. Atomic Notes
 
@@ -140,7 +146,7 @@ Store a note when you encounter:
 - An external service detail (endpoint, quirk) — `ref/`
 - A deployment or operational procedure — `ops/` or `how/`
 
-**Split aggressively.** If you're writing "also" or "additionally" in a note, it should probably be two notes linked by tags and "See also" references.
+**Split aggressively.** Notes are capped at 1000 characters — if you're writing "also" or "additionally", stop and split into two notes linked by tags and "See also:" references. The limit is enforced by the script and cannot be bypassed.
 
 When storing, always place the note under the most specific summary. If no summary fits, create one under the appropriate abstract. If no abstract fits, create one.
 

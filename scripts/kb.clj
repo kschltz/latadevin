@@ -38,6 +38,8 @@
    :kb/layer   {:db/valueType :db.type/string}
    :kb/parent  {:db/valueType :db.type/string}})
 
+(def max-note-chars 1000)
+
 (defn now [] (System/currentTimeMillis))
 
 (defn fmt-ts [ms]
@@ -82,6 +84,19 @@
   (println))
 
 ;; ── Validation ──────────────────────────────────────────────────────
+
+(defn validate-note-length!
+  "Reject note content that exceeds max-note-chars. Notes must be atomic."
+  [content]
+  (let [len (count content)]
+    (when (> len max-note-chars)
+      (println (str "Error: note content is " len " characters (limit is " max-note-chars ")."))
+      (println)
+      (println "Notes must be atomic — one idea, one fact, or one decision.")
+      (println "Break this into smaller notes linked with 'See also:' references:")
+      (println "  kb-store --parent \"<summary>\" \"topic/part-one\" \"First idea.\" tag1")
+      (println "  kb-store --parent \"<summary>\" \"topic/part-two\" \"Second idea. See also: topic/part-one\" tag1")
+      (System/exit 1))))
 
 (defn get-layer
   "Get the layer of a topic, or nil if it doesn't exist."
@@ -210,6 +225,7 @@
                         nil nil "abstract" nil))))))
 
 (defn store-note! [topic content tags source parent & {:keys [create-parents]}]
+  (validate-note-length! content)
   (with-conn
     (fn [conn]
       (if create-parents
@@ -703,7 +719,7 @@
       (println "Latadevin Knowledge Base")
       (println)
       (println "Commands:")
-      (println "  store        --parent <summary> [--create-parents] <topic> <content> [tags...]")
+      (println "  store        --parent <summary> [--create-parents] <topic> <content> [tags...]  (content <= 1000 chars; split larger notes)")
       (println "  abstract     <topic> <content>")
       (println "  summary      [--create-parents] <topic> <content> <parent-abstract>")
       (println "  recall       <query>                                        Search topics, content, tags")

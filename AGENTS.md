@@ -13,11 +13,17 @@ After installation, these commands work globally from any directory:
 ```bash
 kb-tree                              # Full hierarchy view
 kb-recall "<query>"                  # Search
-kb-store --parent "<summary>" "<topic>" "<content>" [tags...]
+kb-store --parent "<summary>" "<topic>" "<content>" [tags...]  # content <= 1000 chars — split larger notes
 kb-abstract "<topic>" "<content>"
 kb-summary "<topic>" "<content>" "<parent-abstract>"
 kb-forget "<topic>"                  # Delete (no children)
 ```
+
+## Note Size Rule — Hard Limit: 1000 Characters
+
+**Every note must be ≤ 1000 characters.** This is enforced by the script — oversized content is rejected with an error.
+
+If content is longer: **split it**. Create multiple smaller notes linked with `See also:` references and shared tags. Never summarize a document or paste a block of text as a single note. One note = one idea.
 
 ## Primary Memory Rules
 

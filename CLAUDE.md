@@ -13,7 +13,7 @@ After installation, these commands work globally from any directory:
 ```bash
 kb-tree                              # Full hierarchy view
 kb-recall "<query>"                  # Search
-kb-store --parent "<summary>" "<topic>" "<content>" [tags...]
+kb-store --parent "<summary>" "<topic>" "<content>" [tags...]  # content <= 1000 chars — split larger notes
 kb-abstract "<topic>" "<content>"
 kb-summary "<topic>" "<content>" "<parent-abstract>"
 kb-forget "<topic>"                  # Delete (no children)
@@ -26,6 +26,12 @@ Or use slash commands in Claude Code chat: `/kb-tree`, `/kb-recall`, `/kb-store`
 A `UserPromptSubmit` hook automatically searches the knowledge base for keywords in every prompt. Relevant entries appear as `<knowledge-base-context>` in the conversation, with parent summary context included for navigation.
 
 This is passive — search explicitly with `kb-recall` when you need deeper context.
+
+## Note Size Rule — Hard Limit: 1000 Characters
+
+**Every note must be ≤ 1000 characters.** This is enforced by the script — oversized content is rejected with an error.
+
+If content is longer: **split it**. Create multiple smaller notes linked with `See also:` references and shared tags. Never summarize a document or paste a block of text as a single note. One note = one idea.
 
 ## Primary Memory Rules
 
