@@ -146,6 +146,7 @@ KB_COMMANDS=(
   kb-recall kb-recall-multi
   kb-get kb-list kb-tree kb-drill
   kb-forget kb-tags kb-by-tag
+  kb-backlinks kb-migrate-links
 )
 
 for cmd in "${KB_COMMANDS[@]}"; do
@@ -290,6 +291,22 @@ Run this command using the Bash tool and display the output to the user:
 
 ```bash
 kb-forget "$ARGUMENTS"
+```'
+
+install_slash_cmd "kb-backlinks" 'Show what links to a topic via graph traversal (including transitive links).
+
+Run this command using the Bash tool and display the output to the user:
+
+```bash
+kb-backlinks "$ARGUMENTS"
+```'
+
+install_slash_cmd "kb-migrate-links" 'Populate :kb/links refs from existing See also: references in note content.
+
+Run this command using the Bash tool and display the output to the user:
+
+```bash
+kb-migrate-links
 ```'
 
 ok "Installed slash commands to $COMMANDS_DIR"

@@ -74,6 +74,10 @@ kb-store --parent "summary/my-group" "arch/my-note" "The actual content." tag1 t
 
 # Delete
 kb-forget "arch/my-note"          # Must have no children
+
+# Graph links (See also: refs are auto-parsed into :kb/links)
+kb-backlinks "arch/my-note"       # What links to this topic?
+kb-migrate-links                  # Backfill links from existing See also: refs
 ```
 
 ### From your coding agent

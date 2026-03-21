@@ -255,6 +255,14 @@
   {:doc "Find entries by tag. Usage: bb kb-by-tag <tag>"
    :task (apply shell "bb" "scripts/kb.clj" "by-tag" *command-line-args*)}
 
+  kb-backlinks
+  {:doc "Show what links to a topic (graph traversal). Usage: bb kb-backlinks <topic>"
+   :task (apply shell "bb" "scripts/kb.clj" "backlinks" *command-line-args*)}
+
+  kb-migrate-links
+  {:doc "Populate :kb/links from existing See also: references."
+   :task (shell "bb" "scripts/kb.clj" "migrate-links")}
+
   ;; ── Search ─────────────────────────────────────────────────────
 
   search

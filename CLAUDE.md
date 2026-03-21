@@ -12,11 +12,13 @@ After installation, these commands work globally from any directory:
 
 ```bash
 kb-tree                              # Full hierarchy view
-kb-recall "<query>"                  # Search
+kb-recall "<query>"                  # Search (follows links + hierarchy recursively)
 kb-store --parent "<summary>" "<topic>" "<content>" [tags...]  # content <= 1000 chars — split larger notes
 kb-abstract "<topic>" "<content>"
 kb-summary "<topic>" "<content>" "<parent-abstract>"
 kb-forget "<topic>"                  # Delete (no children)
+kb-backlinks "<topic>"               # Show what links to a topic (graph traversal)
+kb-migrate-links                     # Populate :kb/links from existing See also: refs
 ```
 
 Or use slash commands in Claude Code chat: `/kb-tree`, `/kb-recall`, `/kb-store`, etc.
@@ -31,7 +33,7 @@ This is passive — search explicitly with `kb-recall` when you need deeper cont
 
 **Every note must be ≤ 1000 characters.** This is enforced by the script — oversized content is rejected with an error.
 
-If content is longer: **split it**. Create multiple smaller notes linked with `See also:` references and shared tags. Never summarize a document or paste a block of text as a single note. One note = one idea.
+If content is longer: **split it**. Create multiple smaller notes linked with `See also:` references and shared tags. `See also:` refs are auto-parsed into `:kb/links` graph refs — enabling backlink queries and recursive search expansion. One note = one idea.
 
 ## Primary Memory Rules
 

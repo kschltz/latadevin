@@ -36,7 +36,8 @@
    :kb/created {:db/valueType :db.type/long}
    :kb/updated {:db/valueType :db.type/long}
    :kb/layer   {:db/valueType :db.type/string}
-   :kb/parent  {:db/valueType :db.type/string}})
+   :kb/parent  {:db/valueType :db.type/string}
+   :kb/links   {:db/valueType :db.type/ref :db/cardinality :db.cardinality/many}})
 
 (def max-note-chars 1000)
 
@@ -56,11 +57,12 @@
 (defn pull-entry
   "Pull a complete entry by entity id, returning a normalized map."
   [db eid]
-  (let [e (d/pull db '[:kb/topic :kb/content :kb/tags :kb/source :kb/created :kb/updated :kb/layer :kb/parent] eid)]
+  (let [e (d/pull db '[:kb/topic :kb/content :kb/tags :kb/source :kb/created :kb/updated :kb/layer :kb/parent {:kb/links [:kb/topic]}] eid)]
     (when (:kb/topic e)
       {:topic   (:kb/topic e)
        :content (:kb/content e)
        :tags    (let [t (:kb/tags e)] (cond (nil? t) [] (string? t) [t] :else (vec t)))
+       :links   (mapv :kb/topic (or (:kb/links e) []))
        :source  (:kb/source e)
        :created (:kb/created e)
        :updated (:kb/updated e)
@@ -74,11 +76,12 @@
     (when (:db/id e)
       (pull-entry db (:db/id e)))))
 
-(defn print-entry [{:keys [topic content tags updated layer parent]}]
+(defn print-entry [{:keys [topic content tags links updated layer parent]}]
   (println (str "## " topic))
   (when layer (println (str "Layer: " layer)))
   (when parent (println (str "Parent: " parent)))
   (when (seq tags) (println (str "Tags: " (clojure.string/join ", " tags))))
+  (when (seq links) (println (str "Links: " (clojure.string/join ", " links))))
   (println (str "Updated: " (fmt-ts updated)))
   (println content)
   (println))
@@ -97,6 +100,56 @@
       (println "  kb-store --parent \"<summary>\" \"topic/part-one\" \"First idea.\" tag1")
       (println "  kb-store --parent \"<summary>\" \"topic/part-two\" \"Second idea. See also: topic/part-one\" tag1")
       (System/exit 1))))
+
+;; ── Link Parsing ─────────────────────────────────────────────────
+
+(defn parse-see-also
+  "Extract topic IDs from 'See also: topic/a, topic/b' in content text."
+  [content]
+  (when-let [[_ refs-str] (re-find #"(?i)See also:\s*([^\n]+)" content)]
+    (->> (clojure.string/split refs-str #",\s*")
+         (map clojure.string/trim)
+         (remove empty?)
+         vec)))
+
+(defn resolve-link-eids
+  "Resolve topic strings to entity IDs. Silently skips non-existent topics."
+  [db topics]
+  (->> topics
+       (keep #(ffirst (d/q '[:find ?e :in $ ?t :where [?e :kb/topic ?t]] db %)))
+       vec))
+
+(defn retract-old-links!
+  "Remove all existing :kb/links from an entity before re-adding."
+  [conn eid db]
+  (let [old-links (d/q '[:find ?linked :in $ ?e :where [?e :kb/links ?linked]] db eid)]
+    (when (seq old-links)
+      (d/transact! conn (mapv (fn [[linked]] [:db/retract eid :kb/links linked]) old-links)))))
+
+;; ── Datalog Rules ────────────────────────────────────────────────
+
+(def hierarchy-rules
+  "Recursive rule: find all descendants of an ancestor topic string via :kb/parent."
+  '[[(descendant? ?anc-topic ?desc)
+     [?desc :kb/parent ?anc-topic]]
+    [(descendant? ?anc-topic ?desc)
+     [?mid :kb/parent ?anc-topic]
+     [?mid :kb/topic ?mid-topic]
+     (descendant? ?mid-topic ?desc)]])
+
+(def link-rules
+  "Recursive rule: find all entities reachable via :kb/links refs."
+  '[[(linked? ?src ?dst)
+     [?src :kb/links ?dst]]
+    [(linked? ?src ?dst)
+     [?src :kb/links ?mid]
+     (linked? ?mid ?dst)]])
+
+(def all-rules
+  "Combined rules for unified queries."
+  (vec (concat hierarchy-rules link-rules)))
+
+;; ── Validation ──────────────────────────────────────────────────────
 
 (defn get-layer
   "Get the layer of a topic, or nil if it doesn't exist."
@@ -145,7 +198,8 @@
 ;; ── Store ───────────────────────────────────────────────────────────
 
 (defn store-entry!
-  "Store an entry with layer and parent validation."
+  "Store an entry with layer and parent validation.
+   Auto-parses 'See also:' references in content and stores as :kb/links refs."
   [conn topic content tags source layer parent]
   (let [ts  (now)
         db  (d/db conn)
@@ -155,14 +209,21 @@
                                [?e :kb/created ?created]]
                       db topic)
         created (or (second (first existing)) ts)
+        ;; Auto-parse "See also:" → :kb/links refs
+        link-topics (parse-see-also content)
+        link-eids   (when (seq link-topics) (resolve-link-eids db link-topics))
         entity (cond-> {:kb/topic   topic
                         :kb/content content
                         :kb/created created
                         :kb/updated ts
                         :kb/layer   layer}
-                 (seq tags)  (assoc :kb/tags (vec tags))
-                 source      (assoc :kb/source source)
-                 parent      (assoc :kb/parent parent))]
+                 (seq tags)      (assoc :kb/tags (vec tags))
+                 source          (assoc :kb/source source)
+                 parent          (assoc :kb/parent parent)
+                 (seq link-eids) (assoc :kb/links link-eids))]
+    ;; On update: retract old links before transacting new ones
+    (when (seq existing)
+      (retract-old-links! conn (ffirst existing) db))
     (d/transact! conn [entity])
     (if (seq existing)
       (println (str "Updated: " topic " [" layer "]"))
@@ -258,84 +319,78 @@
         (some #(clojure.string/includes? (clojure.string/lower-case %) lq)
               (:tags entry)))))
 
-(defn all-entries-by-layer
-  "Fetch all entries for a given layer."
-  [db layer]
-  (let [eids (d/q '[:find ?e :in $ ?layer
-                     :where [?e :kb/layer ?layer]]
-                   db layer)]
-    (keep #(pull-entry db (first %)) eids)))
-
-(defn children-eids
-  "Get entity IDs of entries whose parent is one of the given topics."
-  [db parent-topics]
-  (when (seq parent-topics)
-    (let [results (d/q '[:find ?e ?parent
-                         :in $ [?parent ...]
-                         :where [?e :kb/parent ?parent]]
-                       db (vec parent-topics))]
-      results)))
+(defn find-match-eids
+  "Find all entity IDs whose topic, content, or tags match the query."
+  [db lq]
+  (->> (d/q '[:find ?e :where [?e :kb/topic _]] db)
+       (map first)
+       (filter (fn [eid]
+                 (let [entry (pull-entry db eid)]
+                   (match-entry? entry lq))))
+       vec))
 
 (defn search-entries
-  "Cascading hierarchy-aware search.
-   1. Match abstracts (few entries, cheap)
-   2. Expand matching abstracts → their summaries
-   3. Match summaries (direct + from step 2)
-   4. Expand matching summaries → their notes
-   5. Scan only uncovered notes as fallback (keywords only in note content/tags)
-   6. Merge, deduplicate, return notes sorted by recency."
+  "Graph-aware search using recursive Datalog rules.
+   1. Find all entities matching the query (any layer)
+   2. Expand via hierarchy: descendants of matches (recursive :kb/parent)
+   3. Expand via links: notes reachable through :kb/links refs (recursive)
+   4. Include backlinks: notes that link TO matching entities
+   5. Union, deduplicate, return notes sorted by recency."
   [conn query-str]
   (let [db (d/db conn)
         lq (clojure.string/lower-case query-str)
 
-        ;; Step 1: scan abstracts (few entries, cheap)
-        matching-abstract-topics (->> (all-entries-by-layer db "abstract")
-                                      (filter #(match-entry? % lq))
-                                      (map :topic)
-                                      set)
+        ;; Step 1: find all matching entities (any layer)
+        match-eids (find-match-eids db lq)]
+    (if (empty? match-eids)
+      []
+      (let [;; Collect topics for hierarchy expansion
+            match-topics (->> match-eids
+                              (keep #(:topic (pull-entry db %)))
+                              vec)
 
-        ;; Step 2: summaries under matching abstracts (cascade)
-        cascade-summary-eids (set (map first (children-eids db matching-abstract-topics)))
+            ;; Step 2: hierarchy expansion — recursive descendant? rule
+            descendant-eids
+            (set (map first
+              (d/q '[:find ?desc
+                      :in $ % [?anc-topic ...]
+                      :where (descendant? ?anc-topic ?desc)
+                             [?desc :kb/layer "note"]]
+                   db hierarchy-rules match-topics)))
 
-        ;; Step 3: also match summaries directly by content/topic
-        all-summaries (all-entries-by-layer db "summary")
-        ;; Build topic->eid index once (avoid repeated queries)
-        summary-topic->eid (into {}
-                             (d/q '[:find ?topic ?e
-                                    :where [?e :kb/layer "summary"]
-                                           [?e :kb/topic ?topic]]
-                                  db))
-        direct-match-summary-eids (->> all-summaries
-                                       (filter #(match-entry? % lq))
-                                       (map #(get summary-topic->eid (:topic %)))
-                                       (remove nil?)
-                                       set)
+            ;; Step 3: link expansion — recursive linked? rule
+            linked-eids
+            (set (map first
+              (d/q '[:find ?dst
+                      :in $ % [?src ...]
+                      :where (linked? ?src ?dst)
+                             [?dst :kb/layer "note"]]
+                   db link-rules match-eids)))
 
-        ;; Combine summary eids from cascade + direct match
-        all-matched-summary-eids (clojure.set/union cascade-summary-eids direct-match-summary-eids)
-        matched-summary-topics (->> all-matched-summary-eids
-                                    (keep #(:topic (pull-entry db %)))
-                                    set)
+            ;; Step 4: backlinks — notes that link TO any match
+            backlink-eids
+            (set (map first
+              (d/q '[:find ?src
+                      :in $ [?dst ...]
+                      :where [?src :kb/links ?dst]
+                             [?src :kb/layer "note"]]
+                   db match-eids)))
 
-        ;; Step 4: notes under matched summaries (cascade)
-        cascade-note-eids (set (map first (children-eids db matched-summary-topics)))
+            ;; Direct note matches
+            direct-note-eids
+            (set (filter
+                   (fn [eid] (= "note" (:layer (pull-entry db eid))))
+                   match-eids))
 
-        ;; Step 5: fallback — scan only notes NOT already reached by cascade
-        all-note-eids (set (map first (d/q '[:find ?e :where [?e :kb/layer "note"]] db)))
-        uncovered-note-eids (clojure.set/difference all-note-eids cascade-note-eids)
-        direct-match-note-eids (when (seq uncovered-note-eids)
-                                 (->> uncovered-note-eids
-                                      (keep #(let [entry (pull-entry db %)]
-                                               (when (match-entry? entry lq) %)))
-                                      set))
-
-        ;; Step 6: merge and pull
-        final-note-eids (clojure.set/union
-                          cascade-note-eids
-                          (or direct-match-note-eids #{}))]
-    (->> final-note-eids
-         (keep #(pull-entry db %))
-         (sort-by :updated >))))
+            ;; Union all note eids
+            all-note-eids (clojure.set/union
+                            direct-note-eids
+                            descendant-eids
+                            linked-eids
+                            backlink-eids)]
+        (->> all-note-eids
+             (keep #(pull-entry db %))
+             (sort-by :updated >))))))
 
 (defn dedupe-results
   "Deduplicate entries by topic, preserving order."
@@ -413,6 +468,8 @@
             (when (:parent entry) (println (str "Parent: " (:parent entry))))
             (when (seq (:tags entry))
               (println (str "Tags: " (clojure.string/join ", " (:tags entry)))))
+            (when (seq (:links entry))
+              (println (str "Links: " (clojure.string/join ", " (:links entry)))))
             (when (:source entry)
               (println (str "Source: " (:source entry))))
             (println (str "Created: " (fmt-ts (:created entry))))
@@ -602,6 +659,58 @@
               (print-entry entry)))
           (println (str "No entries with tag: " tag)))))))
 
+;; ── Links & Backlinks ──────────────────────────────────────────────
+
+(defn backlinks [topic]
+  (with-conn
+    (fn [conn]
+      (let [db  (d/db conn)
+            eid (ffirst (d/q '[:find ?e :in $ ?t :where [?e :kb/topic ?t]] db topic))]
+        (if-not eid
+          (println (str "Not found: " topic))
+          (let [;; Direct backlinks
+                direct (d/q '[:find ?src-topic
+                              :in $ ?dst
+                              :where [?src :kb/links ?dst]
+                                     [?src :kb/topic ?src-topic]]
+                            db eid)
+                ;; Transitive backlinks (everything that can reach this via links)
+                transitive (d/q '[:find ?src-topic
+                                  :in $ % ?dst
+                                  :where (linked? ?src ?dst)
+                                         [?src :kb/topic ?src-topic]]
+                                db link-rules eid)
+                all-topics (->> (concat (map first direct) (map first transitive))
+                                distinct
+                                (remove #(= % topic))
+                                sort)]
+            (if (seq all-topics)
+              (do (println (str "Backlinks to " topic ":"))
+                  (doseq [t all-topics]
+                    (println (str "  <- " t))))
+              (println (str "No backlinks to " topic)))))))))
+
+(defn migrate-links!
+  "Scan all entries with 'See also:' in content and populate :kb/links refs."
+  []
+  (with-conn
+    (fn [conn]
+      (let [db       (d/db conn)
+            all-eids (map first (d/q '[:find ?e :where [?e :kb/topic _]] db))
+            migrated (atom 0)]
+        (doseq [eid all-eids]
+          (let [entry       (pull-entry db eid)
+                link-topics (parse-see-also (:content entry))
+                link-eids   (when (seq link-topics)
+                              (resolve-link-eids db link-topics))]
+            (when (seq link-eids)
+              ;; Retract old links, add new
+              (retract-old-links! conn eid db)
+              (d/transact! conn [{:db/id eid :kb/links link-eids}])
+              (swap! migrated inc)
+              (println (str "  Linked: " (:topic entry) " → " (pr-str link-topics))))))
+        (println (str "Migration complete. " @migrated " entries linked."))))))
+
 ;; ── CLI Argument Parsing ────────────────────────────────────────────
 
 (defn parse-flag
@@ -715,6 +824,16 @@
         (System/exit 1))
       (by-tag tag))
 
+    "backlinks"
+    (let [[topic] args]
+      (when-not topic
+        (println "Usage: bb scripts/kb.clj backlinks <topic>")
+        (System/exit 1))
+      (backlinks topic))
+
+    "migrate-links"
+    (migrate-links!)
+
     (do
       (println "Latadevin Knowledge Base")
       (println)
@@ -732,6 +851,8 @@
       (println "  forget       <topic>                                        Remove entry (no children)")
       (println "  tags                                                        List all tags")
       (println "  by-tag       <tag>                                          Find entries by tag")
+      (println "  backlinks    <topic>                                        Show what links to a topic")
+      (println "  migrate-links                                               Populate :kb/links from See also: refs")
       (println)
       (println "Flags:")
       (println "  --create-parents   Auto-create missing parent abstract/summary hierarchy")

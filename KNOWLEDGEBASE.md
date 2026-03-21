@@ -98,12 +98,13 @@ Layer-specific prefixes:
 
 Each note must be understandable on its own. Include enough context that a future reader (you, in a new session) can act on it. Write in the present tense.
 
-### 4. Link via Tags, Parents, and Explicit References
+### 4. Link via Tags, Parents, and Graph Links
 
 Connect notes through:
 - **Parent**: Every note belongs to a summary, every summary to an abstract
 - **Tags**: Shared tags create implicit clusters
-- **Explicit references**: Mention related topic IDs in content: `"See also: arch/db-choice"`
+- **Graph links**: Write `See also: arch/db-choice, arch/other` in content — these are auto-parsed and stored as `:kb/links` refs in Datalevin, enabling graph traversal and backlink queries
+- Use `bb kb-backlinks "<topic>"` to find what links to a topic
 
 ### 5. Content Structure
 
@@ -131,9 +132,21 @@ bb kb-drill "<topic>"            # Drill into a topic and its children
 
 ```bash
 bb kb-forget "<topic-id>"        # Delete an entry (must have no children)
+bb kb-backlinks "<topic-id>"     # Show what links to a topic (graph traversal)
+bb kb-migrate-links              # Populate :kb/links from existing See also: refs
 ```
 
 Entries with children cannot be deleted. Delete or reparent children first.
+
+## Graph Links
+
+`See also:` references in note content are automatically parsed and stored as `:kb/links` refs in Datalevin. This enables:
+
+- **Backlink queries**: `bb kb-backlinks "arch/db-choice"` finds all notes linking to it (transitively)
+- **Search expansion**: `bb kb-recall` follows links and backlinks to surface related notes
+- **Recursive Datalog rules** traverse both the parent hierarchy and link graph
+
+Run `bb kb-migrate-links` to retroactively populate links for notes created before this feature.
 
 ## When to Store
 
