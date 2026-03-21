@@ -82,7 +82,8 @@ if [ ! -f "$SETTINGS_FILE" ]; then
 {
   "permissions": {
     "allow": [
-      "Bash(bb:*)"
+      "Bash(bb:*)",
+      "Bash(kb-*:*)"
     ]
   },
   "hooks": {
@@ -110,17 +111,19 @@ else
     ok "Added auto-recall hook to UserPromptSubmit"
   fi
 
-  if jq -e '.permissions.allow // [] | any(. == "Bash(bb:*)")' "$SETTINGS_FILE" >/dev/null 2>&1; then
-    ok "Bash(bb:*) permission already present"
-  else
-    UPDATED=$(jq '
-      .permissions //= {} |
-      .permissions.allow //= [] |
-      .permissions.allow += ["Bash(bb:*)"]
-    ' "$SETTINGS_FILE")
-    echo "$UPDATED" > "$SETTINGS_FILE"
-    ok "Added Bash(bb:*) permission"
-  fi
+  for PERM in 'Bash(bb:*)' 'Bash(kb-*:*)'; do
+    if jq -e --arg p "$PERM" '.permissions.allow // [] | any(. == $p)' "$SETTINGS_FILE" >/dev/null 2>&1; then
+      ok "$PERM permission already present"
+    else
+      UPDATED=$(jq --arg p "$PERM" '
+        .permissions //= {} |
+        .permissions.allow //= [] |
+        .permissions.allow += [$p]
+      ' "$SETTINGS_FILE")
+      echo "$UPDATED" > "$SETTINGS_FILE"
+      ok "Added $PERM permission"
+    fi
+  done
 fi
 
 # ── Patch hook script with correct KB path ──────────────────────────
@@ -167,49 +170,124 @@ mkdir -p "$COMMANDS_DIR"
 
 install_slash_cmd() {
   local name="$1"
-  local description="$2"
-  local usage="$3"
+  local body="$2"
   cat > "$COMMANDS_DIR/${name}.md" <<MD
-${description}
-
-\`\`\`bash
-${usage}
-\`\`\`
+${body}
 MD
 }
 
-install_slash_cmd "kb-tree"    "Print the full knowledge base hierarchy." \
-  "kb-tree"
+install_slash_cmd "kb-tree" 'Print the full knowledge base hierarchy (abstracts → summaries → notes).
 
-install_slash_cmd "kb-recall"  "Search the knowledge base. Usage: /kb-recall <query>" \
-  'kb-recall "$ARGUMENTS"'
+Run this command using the Bash tool and display the output to the user:
 
-install_slash_cmd "kb-get"     "Get a specific KB entry by topic ID. Usage: /kb-get <topic>" \
-  'kb-get "$ARGUMENTS"'
+```bash
+kb-tree
+```'
 
-install_slash_cmd "kb-list"    "List recent knowledge base entries." \
-  "kb-list"
+install_slash_cmd "kb-recall" 'Search the knowledge base by topic, content, and tags.
 
-install_slash_cmd "kb-drill"   "Show an entry and all its children. Usage: /kb-drill <topic>" \
-  'kb-drill "$ARGUMENTS"'
+Run this command using the Bash tool and display the output to the user:
 
-install_slash_cmd "kb-store"   "Store a note. Usage: /kb-store --parent <summary> <topic> <content> [tags...]" \
-  'kb-store $ARGUMENTS'
+```bash
+kb-recall "$ARGUMENTS"
+```'
 
-install_slash_cmd "kb-abstract" "Create a top-level abstract. Usage: /kb-abstract <topic> <content>" \
-  'kb-abstract $ARGUMENTS'
+install_slash_cmd "kb-get" 'Get a specific KB entry by its exact topic ID (e.g. "arch/my-decision").
 
-install_slash_cmd "kb-summary"  "Create a summary under an abstract. Usage: /kb-summary <topic> <content> <parent>" \
-  'kb-summary $ARGUMENTS'
+Run this command using the Bash tool and display the output to the user:
 
-install_slash_cmd "kb-tags"    "List all tags with counts." \
-  "kb-tags"
+```bash
+kb-get "$ARGUMENTS"
+```'
 
-install_slash_cmd "kb-by-tag"  "Find entries by tag. Usage: /kb-by-tag <tag>" \
-  'kb-by-tag "$ARGUMENTS"'
+install_slash_cmd "kb-list" 'List recent knowledge base entries sorted by update time.
 
-install_slash_cmd "kb-forget"  "Delete an entry (must have no children). Usage: /kb-forget <topic>" \
-  'kb-forget "$ARGUMENTS"'
+Run this command using the Bash tool and display the output to the user:
+
+```bash
+kb-list
+```'
+
+install_slash_cmd "kb-drill" 'Show an entry and all its children. Works at any layer: abstract shows summaries+notes, summary shows notes.
+
+Run this command using the Bash tool and display the output to the user:
+
+```bash
+kb-drill "$ARGUMENTS"
+```'
+
+install_slash_cmd "kb-store" 'Store a note in the knowledge base.
+
+**Syntax**: `kb-store --parent <summary-topic> [--create-parents] <topic> <content> [tags...]`
+
+- `--parent` is required — specifies which summary this note belongs under.
+- `--create-parents` is optional — auto-creates missing summary and abstract if they do not exist.
+- Run `kb-tree` first to see existing summaries, or use `--create-parents` to skip that step.
+
+**Examples**:
+```bash
+# Store under existing summary:
+kb-store --parent "summary/my-group" "ref/my-note" "Content here." tag1 tag2
+
+# Auto-create parent hierarchy if missing:
+kb-store --create-parents --parent "summary/my-group" "ref/my-note" "Content here." tag1 tag2
+```
+
+Run this command using the Bash tool and display the output to the user:
+
+```bash
+kb-store $ARGUMENTS
+```'
+
+install_slash_cmd "kb-abstract" 'Create a top-level abstract (domain anchor). Abstracts are the root of the hierarchy.
+
+**Syntax**: `kb-abstract <topic> <content>`
+
+Example: `kb-abstract "abstract/my-project" "Description of the project domain."`
+
+Run this command using the Bash tool and display the output to the user:
+
+```bash
+kb-abstract $ARGUMENTS
+```'
+
+install_slash_cmd "kb-summary" 'Create a summary under an abstract. Summaries group related notes.
+
+**Syntax**: `kb-summary [--create-parents] <topic> <content> <parent-abstract>`
+
+- `--create-parents` auto-creates the parent abstract if it does not exist.
+
+Example: `kb-summary "summary/my-group" "What this group covers." "abstract/my-project"`
+
+Run this command using the Bash tool and display the output to the user:
+
+```bash
+kb-summary $ARGUMENTS
+```'
+
+install_slash_cmd "kb-tags" 'List all tags with counts.
+
+Run this command using the Bash tool and display the output to the user:
+
+```bash
+kb-tags
+```'
+
+install_slash_cmd "kb-by-tag" 'Find all entries with a specific tag.
+
+Run this command using the Bash tool and display the output to the user:
+
+```bash
+kb-by-tag "$ARGUMENTS"
+```'
+
+install_slash_cmd "kb-forget" 'Delete an entry by topic ID. Entry must have no children — delete or reparent children first.
+
+Run this command using the Bash tool and display the output to the user:
+
+```bash
+kb-forget "$ARGUMENTS"
+```'
 
 ok "Installed slash commands to $COMMANDS_DIR"
 

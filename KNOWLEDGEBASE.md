@@ -36,7 +36,7 @@ bb kb-store --parent "<parent-summary>" "<topic>" "<content>" [tag1 tag2 ...]
 
 ### Storing Notes
 
-Notes require `--parent <summary-topic>` to place them in the hierarchy. Use `bb kb-tree` to find the right summary, or create a new one first.
+Notes require `--parent <summary-topic>` to place them in the hierarchy. Use `bb kb-tree` to find the right summary, or use `--create-parents` to auto-create missing hierarchy.
 
 ```bash
 # First, check what summaries exist
@@ -54,7 +54,12 @@ See also: arch/stonehenge-services" \
 # Or create a new summary first if needed
 bb kb-summary "summary/new-group" "Description of this group." "abstract/stonehenge"
 bb kb-store --parent "summary/new-group" "arch/new-thing" "Content." tag1 tag2
+
+# Or use --create-parents to auto-create missing summary and abstract
+bb kb-store --create-parents --parent "summary/new-group" "arch/new-thing" "Content." tag1 tag2
 ```
+
+The `--create-parents` flag also works with `kb-summary` to auto-create a missing parent abstract.
 
 ## Zettelkasten Note Principles
 

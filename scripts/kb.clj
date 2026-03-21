@@ -4,9 +4,9 @@
 ;; Usage: bb scripts/kb.clj <command> [args...]
 ;;
 ;; Commands:
-;;   store        --parent <parent> <topic> <content> [tags...]  Store a note under a summary
+;;   store        --parent <parent> [--create-parents] <topic> <content> [tags...]  Store a note under a summary
 ;;   abstract     <topic> <content>                              Create a top-level abstract
-;;   summary      <topic> <content> <parent-abstract>            Create a summary under an abstract
+;;   summary      [--create-parents] <topic> <content> <parent-abstract>            Create a summary under an abstract
 ;;   recall       <query>                                        Search by topic, content, and tags
 ;;   recall-multi <word1> [word2...]                              Search multiple keywords
 ;;   recall-with-context <word1> [word2...]                       Search with parent summaries
@@ -91,14 +91,35 @@
                         [?e :kb/layer ?layer]]
                db topic)))
 
+(defn list-topics-by-layer
+  "List all topic strings for a given layer."
+  [db layer]
+  (->> (d/q '[:find ?topic :in $ ?layer
+              :where [?e :kb/layer ?layer]
+                     [?e :kb/topic ?topic]]
+            db layer)
+       (map first)
+       sort))
+
 (defn validate-parent!
-  "Validate parent exists with the expected layer. Returns true or exits."
+  "Validate parent exists with the expected layer. Returns true or exits with helpful guidance."
   [db parent expected-parent-layer]
   (let [actual (get-layer db parent)]
     (cond
       (nil? actual)
-      (do (println (str "Error: parent '" parent "' not found."))
-          (System/exit 1))
+      (let [available (list-topics-by-layer db expected-parent-layer)
+            plural (if (= expected-parent-layer "summary") "summaries" (str expected-parent-layer "s"))]
+        (println (str "Error: parent '" parent "' not found."))
+        (if (seq available)
+          (do (println (str "\nAvailable " plural ":"))
+              (doseq [t available] (println (str "  " t)))
+              (println (str "\nOr use --create-parents to auto-create missing hierarchy.")))
+          (println (str "\nNo " plural " exist yet. Create one first:"
+                        (if (= expected-parent-layer "abstract")
+                          (str "\n  kb-abstract \"" parent "\" \"Description here\"")
+                          (str "\n  kb-summary \"" parent "\" \"Description here\" \"<abstract-topic>\""
+                               "\n\nOr use --create-parents to auto-create missing hierarchy.")))))
+        (System/exit 1))
 
       (not= actual expected-parent-layer)
       (do (println (str "Error: parent '" parent "' is layer '" actual "', expected '" expected-parent-layer "'."))
@@ -132,10 +153,68 @@
       (println (str "Updated: " topic " [" layer "]"))
       (println (str "Stored: " topic " [" layer "]")))))
 
-(defn store-note! [topic content tags source parent]
+(defn infer-abstract-topic
+  "Derive an abstract topic from a summary topic.
+   e.g. 'summary/my-project-design' → 'abstract/my-project'"
+  [summary-topic]
+  (let [;; Strip 'summary/' prefix if present
+        base (if (clojure.string/starts-with? summary-topic "summary/")
+               (subs summary-topic (count "summary/"))
+               summary-topic)
+        ;; Try to get the project part (first segment before last hyphen group)
+        parts (clojure.string/split base #"-")
+        project (if (> (count parts) 1)
+                  (clojure.string/join "-" (butlast parts))
+                  base)]
+    (str "abstract/" project)))
+
+(defn ensure-parent-chain!
+  "When --create-parents is used, auto-create missing abstract/summary parents.
+   For a note: ensures parent summary exists (and its abstract).
+   For a summary: ensures parent abstract exists."
+  [conn parent expected-parent-layer]
+  (let [db (d/db conn)
+        actual (get-layer db parent)]
+    (cond
+      ;; Parent exists with correct layer — good
+      (= actual expected-parent-layer)
+      true
+
+      ;; Parent exists with wrong layer — error
+      (some? actual)
+      (do (println (str "Error: parent '" parent "' is layer '" actual "', expected '" expected-parent-layer "'."))
+          (System/exit 1))
+
+      ;; Parent doesn't exist — create it
+      (nil? actual)
+      (case expected-parent-layer
+        "summary"
+        (do
+          (println (str "Auto-creating missing summary: " parent))
+          (let [abstract-topic (infer-abstract-topic parent)
+                abstract-exists (get-layer db abstract-topic)]
+            (when-not abstract-exists
+              (println (str "Auto-creating missing abstract: " abstract-topic))
+              (store-entry! conn abstract-topic
+                            (str "Auto-created abstract for " parent)
+                            nil nil "abstract" nil))
+            (store-entry! conn parent
+                          (str "Auto-created summary (update with real description)")
+                          nil nil "summary" abstract-topic)))
+
+        "abstract"
+        (do
+          (println (str "Auto-creating missing abstract: " parent))
+          (store-entry! conn parent
+                        (str "Auto-created abstract (update with real description)")
+                        nil nil "abstract" nil))))))
+
+(defn store-note! [topic content tags source parent & {:keys [create-parents]}]
   (with-conn
     (fn [conn]
-      (validate-parent! (d/db conn) parent "summary")
+      (if create-parents
+        (ensure-parent-chain! conn parent "summary")
+        (validate-parent! (d/db conn) parent "summary"))
       (store-entry! conn topic content tags source "note" parent))))
 
 (defn store-abstract! [topic content]
@@ -143,10 +222,12 @@
     (fn [conn]
       (store-entry! conn topic content nil nil "abstract" nil))))
 
-(defn store-summary! [topic content parent]
+(defn store-summary! [topic content parent & {:keys [create-parents]}]
   (with-conn
     (fn [conn]
-      (validate-parent! (d/db conn) parent "abstract")
+      (if create-parents
+        (ensure-parent-chain! conn parent "abstract")
+        (validate-parent! (d/db conn) parent "abstract"))
       (store-entry! conn topic content nil nil "summary" parent))))
 
 ;; ── Search ──────────────────────────────────────────────────────────
@@ -517,19 +598,32 @@
        :rest-args (concat (take idx args) (drop (+ idx 2) args))}
       {:value nil :rest-args args})))
 
+(defn parse-boolean-flag
+  "Check for a boolean --flag (no value). Returns {:present? bool :rest-args remaining}."
+  [args flag-name]
+  (let [flag (str "--" flag-name)
+        idx (.indexOf (vec args) flag)]
+    (if (>= idx 0)
+      {:present? true
+       :rest-args (concat (take idx args) (drop (inc idx) args))}
+      {:present? false :rest-args args})))
+
 ;; ── Main Dispatch ───────────────────────────────────────────────────
 
 (let [[cmd & args] *command-line-args*]
   (case cmd
     "store"
-    (let [{:keys [value rest-args]} (parse-flag args "parent")
+    (let [{cp-present? :present? cp-args :rest-args} (parse-boolean-flag args "create-parents")
+          {:keys [value rest-args]} (parse-flag cp-args "parent")
           parent value
           [topic content & tags] rest-args]
       (when-not (and topic content parent)
         (println "Usage: bb scripts/kb.clj store --parent <parent-summary> <topic> <content> [tags...]")
+        (println "       --create-parents   Auto-create missing parent summary and abstract")
         (System/exit 1))
       (store-note! topic content tags (or (System/getenv "DATALEVIN_KB_SOURCE")
-                                          (System/getenv "CLAUDE_KB_SOURCE")) parent))
+                                          (System/getenv "CLAUDE_KB_SOURCE")) parent
+                   :create-parents cp-present?))
 
     "abstract"
     (let [[topic content] args]
@@ -539,11 +633,13 @@
       (store-abstract! topic content))
 
     "summary"
-    (let [[topic content parent] args]
+    (let [{cp-present? :present? cp-args :rest-args} (parse-boolean-flag args "create-parents")
+          [topic content parent] cp-args]
       (when-not (and topic content parent)
         (println "Usage: bb scripts/kb.clj summary <topic> <content> <parent-abstract>")
+        (println "       --create-parents   Auto-create missing parent abstract")
         (System/exit 1))
-      (store-summary! topic content parent))
+      (store-summary! topic content parent :create-parents cp-present?))
 
     "recall"
     (let [[query-str] args]
@@ -607,9 +703,9 @@
       (println "Latadevin Knowledge Base")
       (println)
       (println "Commands:")
-      (println "  store        --parent <summary> <topic> <content> [tags...]  Store a note")
-      (println "  abstract     <topic> <content>                              Create top-level abstract")
-      (println "  summary      <topic> <content> <parent-abstract>            Create summary")
+      (println "  store        --parent <summary> [--create-parents] <topic> <content> [tags...]")
+      (println "  abstract     <topic> <content>")
+      (println "  summary      [--create-parents] <topic> <content> <parent-abstract>")
       (println "  recall       <query>                                        Search topics, content, tags")
       (println "  recall-multi <word1> [word2...]                              Multi-keyword search")
       (println "  recall-with-context <word1> [word2...]                       Search with parent context")
@@ -620,5 +716,8 @@
       (println "  forget       <topic>                                        Remove entry (no children)")
       (println "  tags                                                        List all tags")
       (println "  by-tag       <tag>                                          Find entries by tag")
+      (println)
+      (println "Flags:")
+      (println "  --create-parents   Auto-create missing parent abstract/summary hierarchy")
       (println)
       (println (str "Database: " db-path)))))

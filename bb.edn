@@ -208,7 +208,7 @@
   ;; ── Knowledge Base ──────────────────────────────────────────────
 
   kb-store
-  {:doc "Store a note. Usage: bb kb-store --parent <summary> <topic> <content> [tags...]"
+  {:doc "Store a note. Usage: bb kb-store --parent <summary> [--create-parents] <topic> <content> [tags...]"
    :task (apply shell "bb" "scripts/kb.clj" "store" *command-line-args*)}
 
   kb-abstract
@@ -216,7 +216,7 @@
    :task (apply shell "bb" "scripts/kb.clj" "abstract" *command-line-args*)}
 
   kb-summary
-  {:doc "Create a summary under an abstract. Usage: bb kb-summary <topic> <content> <parent-abstract>"
+  {:doc "Create a summary under an abstract. Usage: bb kb-summary [--create-parents] <topic> <content> <parent-abstract>"
    :task (apply shell "bb" "scripts/kb.clj" "summary" *command-line-args*)}
 
   kb-recall
