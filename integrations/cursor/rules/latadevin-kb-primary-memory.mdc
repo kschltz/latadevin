@@ -1,0 +1,21 @@
+---
+description: Latadevin KB is primary long-term memory — consult and store with kb-* commands
+alwaysApply: true
+---
+
+# Knowledge base is primary long-term memory
+
+The **Latadevin / Datalevin knowledge base (KB)** is the agent’s **primary long-term memory**. This chat does not persist across sessions; facts, decisions, procedures, and gotchas that should survive belong in the KB.
+
+## What to do
+
+- **Before non-trivial work**: run `kb-tree` and/or `kb-recall "<query>"` to load relevant context. Do not treat `sessionStart` snippets as sufficient recall—they are a small, recent sample.
+- **After meaningful progress**: persist non-obvious outcomes with `kb-store`, `kb-abstract`, or `kb-summary` as described in `KNOWLEDGEBASE.md`. Each note body ≤ 1000 characters; split larger material and link with `See also:`.
+
+## Commands and docs
+
+Use global `kb-*` commands (see `AGENTS.md` and `KNOWLEDGEBASE.md`). Override DB location with `DATALEVIN_KB_PATH` if needed.
+
+## Cursor-specific
+
+Cursor’s `sessionStart` hook only surfaces **recent** KB lines. For task-specific memory, **run `kb-recall` (or `kb-get`) yourself**—there is no per-prompt keyword injection like Claude Code’s `UserPromptSubmit`.

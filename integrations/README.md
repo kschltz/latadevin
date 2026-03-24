@@ -15,14 +15,15 @@ integrations/
 
 | Agent | Directory | Notes |
 |-------|-----------|-------|
-| Claude Code | `claude-code/` | `UserPromptSubmit` hook for auto-recall |
+| Claude Code | `claude-code/` | `UserPromptSubmit` hook for keyword auto-recall |
+| Cursor | `cursor/` | `sessionStart` hook injects recent entries; see `cursor/README.md` |
 
 ## Adding a New Agent
 
 1. Create `integrations/<agent-name>/`
 2. Add an `install.sh` that configures the agent's settings/hooks
-3. Add a hook script under `hooks/` that reads the agent's prompt format and runs `bb scripts/kb.clj recall-multi <keywords>`
-4. Output matching results wrapped in whatever context format the agent expects
+3. Add hook script(s) under `hooks/` that read the agent's stdin format and either run `bb scripts/kb.clj recall-multi <keywords>` (when the platform can inject context from the user prompt) or use lifecycle hooks that support `additional_context` (e.g. Cursor `sessionStart`)
+4. Output results in the format the agent expects (plain text for Claude Code hooks, JSON on stdout for Cursor)
 5. Update `README.md` to document the new integration
 
 ## Environment Variables

@@ -36,6 +36,7 @@ The installer defaults to Claude Code. To install for a specific agent:
 
 ```bash
 ./install.sh claude-code   # Claude Code (default)
+./install.sh cursor        # Cursor (sessionStart hook + kb-* wrappers)
 ./install.sh <agent>       # Other agents (see integrations/)
 ```
 
@@ -152,7 +153,8 @@ Notes use prefixed topic IDs for easy navigation:
 
 | Agent | Integration | Auto-recall hook |
 |-------|-------------|-----------------|
-| Claude Code | `integrations/claude-code/` | Yes (`UserPromptSubmit`) |
+| Claude Code | `integrations/claude-code/` | Yes — `UserPromptSubmit` keyword search |
+| Cursor | `integrations/cursor/` | Partial — `sessionStart` injects recent KB entries; per-prompt injection is not supported by Cursor’s `beforeSubmitPrompt` API yet (see `integrations/cursor/README.md`) |
 
 To add a new agent, see `integrations/README.md`.
 
@@ -167,6 +169,8 @@ rm -rf ~/.claude/datalevin-kb
 ```
 
 For Claude Code: remove the `UserPromptSubmit` hook referencing `kb-recall.sh` from `~/.claude/settings.json`.
+
+For Cursor: remove the `sessionStart` entry for `latadevin-kb-session-start.sh` from `~/.cursor/hooks.json` and delete `~/.cursor/hooks/latadevin-kb-session-start.sh` if desired (see `integrations/cursor/README.md`).
 
 ## Also included
 

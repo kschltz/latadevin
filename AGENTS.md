@@ -38,6 +38,8 @@ If content is longer: **split it**. Create multiple smaller notes linked with `S
 
 If your agent supports prompt hooks, configure it to run `kb-recall` on each prompt and inject results as context. Without a hook, run `kb-recall` manually at the start of relevant tasks.
 
+**Cursor**: `./install.sh cursor` installs a `sessionStart` hook (recent KB sample + explicit “primary long-term memory” framing), copies `integrations/cursor/rules/latadevin-kb-primary-memory.mdc` to `~/.cursor/latadevin/` for linking into `.cursor/rules/`, and global `kb-*` wrappers. Cursor’s `beforeSubmitPrompt` hook cannot inject text yet, so run `kb-recall` when you need search keyed to the current message (see `integrations/cursor/README.md`).
+
 ## Database Location
 
 Default: `~/.local/share/datalevin-kb`.
