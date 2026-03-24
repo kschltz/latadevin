@@ -8,7 +8,7 @@ The knowledge base uses three layers for top-down navigation:
 
 | Layer | Purpose | Has parent? | Has tags? |
 |-------|---------|-------------|-----------|
-| **abstract** | Broad domain anchor (e.g., "stonehenge", "payments") | No | No |
+| **abstract** | Broad domain anchor (e.g., "notetaking", "payments") | No | No |
 | **summary** | Subfield grouping under an abstract | Yes (abstract) | No |
 | **note** | Atomic Zettelkasten note with actual content | Yes (summary) | Yes |
 
