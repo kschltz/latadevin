@@ -36,7 +36,7 @@ The installer defaults to Claude Code. To install for a specific agent:
 
 ```bash
 ./install.sh claude-code   # Claude Code (default)
-./install.sh cursor        # Cursor (sessionStart hook + kb-* wrappers)
+./install.sh cursor        # Cursor (sessionStart: kb-recall-multi + kb list + kb-* wrappers)
 ./install.sh <agent>       # Other agents (see integrations/)
 ```
 
@@ -64,14 +64,15 @@ kb-list                           # Recent entries
 kb-tags                           # All tags with counts
 
 # Search
-kb-recall "search query"          # Full-text search
+kb-recall "search query"          # Full-text search (phrase; follows links + hierarchy)
+kb-recall-multi word1 word2       # Multiple keywords in one run, deduped (Claude auto-recall uses this)
 kb-get "arch/my-decision"         # Get specific entry
 kb-by-tag "architecture"          # All notes with a tag
 
 # Create
 kb-abstract "abstract/my-domain" "Description of this domain."
 kb-summary "summary/my-group" "What this group covers." "abstract/my-domain"
-kb-store --parent "summary/my-group" "arch/my-note" "The actual content." tag1 tag2  # content <= 1000 chars
+kb-store --parent "summary/my-group" "arch/my-note" "The actual content." tag1 tag2  # body <= 250 chars (same for kb-abstract / kb-summary)
 
 # Delete
 kb-forget "arch/my-note"          # Must have no children
@@ -127,7 +128,7 @@ This is passive — it adds ~0-2 seconds per prompt and only injects when there 
 
 ### Note conventions
 
-**Notes are hard-capped at 1000 characters.** The script rejects anything longer. If content is too large, split it into multiple notes linked with `See also:` references and shared tags.
+**Abstract, summary, and note bodies are hard-capped at 250 characters** (`kb-abstract`, `kb-summary`, `kb-store`). The script rejects anything longer. Split into more summaries/notes and link with `See also:` and tags.
 
 Notes use prefixed topic IDs for easy navigation:
 
@@ -149,12 +150,14 @@ Notes use prefixed topic IDs for easy navigation:
 | `DATALEVIN_KB_PATH` | `~/.local/share/datalevin-kb` | Database location |
 | `CLAUDE_KB_PATH` | — | Legacy alias (still supported) |
 
+**Path resolution** (when unset): existing `~/.claude/datalevin-kb` is used before `~/.local/share/datalevin-kb`. See **Database Location** in `KNOWLEDGEBASE.md` for the full order.
+
 ## Supported Agents
 
 | Agent | Integration | Auto-recall hook |
 |-------|-------------|-----------------|
-| Claude Code | `integrations/claude-code/` | Yes — `UserPromptSubmit` keyword search |
-| Cursor | `integrations/cursor/` | Partial — `sessionStart` injects recent KB entries; per-prompt injection is not supported by Cursor’s `beforeSubmitPrompt` API yet (see `integrations/cursor/README.md`) |
+| Claude Code | `integrations/claude-code/` | Yes — `UserPromptSubmit` runs `kb-recall-multi` on extracted keywords |
+| Cursor | `integrations/cursor/` | Partial — `sessionStart` runs **`kb-recall-multi`** on workspace folder keywords plus **`kb list`**; per-prompt injection is not supported by Cursor’s `beforeSubmitPrompt` API yet (see `integrations/cursor/README.md`) |
 
 To add a new agent, see `integrations/README.md`.
 

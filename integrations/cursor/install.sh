@@ -2,9 +2,9 @@
 set -euo pipefail
 
 # Cursor integration — Latadevin Knowledge Base
-# - sessionStart hook: injects recent KB entries + primary-memory framing (additional_context)
-# - Cursor rule template → ~/.cursor/latadevin/ (link into each repo’s .cursor/rules/)
-# - Global kb-* wrappers in ~/.local/bin
+# - sessionStart hook: kb-recall-multi on workspace folder keywords + kb list + framing (additional_context)
+# - Cursor rule template → ~/.cursor/latadevin/ (symlink into each repo’s .cursor/rules/)
+# - Global kb-* wrappers in ~/.local/bin (includes kb-recall-multi)
 #
 # Cursor's beforeSubmitPrompt cannot inject context (only continue / user_message);
 # per-prompt keyword recall like Claude Code is not available until Cursor extends that hook.
@@ -145,9 +145,10 @@ echo "Cursor loads ~/.cursor/hooks.json automatically. Start a new Agent chat (o
 echo "to pick up the sessionStart hook — recent KB entries appear as additional context."
 echo ""
 echo "Per-prompt keyword recall (like Claude Code) is not supported: Cursor's beforeSubmitPrompt"
-echo "hook cannot inject context yet. Use kb-recall from the agent when you need a targeted search."
+echo "hook cannot inject context yet. Use kb-recall or kb-recall-multi from the agent when you need search."
 echo ""
-echo "Global commands: kb-tree, kb-recall, kb-store, …"
+echo "Global commands (all projects): kb-tree, kb-recall, kb-recall-multi, kb-store, kb-get, …"
+echo "sessionStart runs kb-recall-multi on words from workspace folder names (see integrations/cursor/README.md)."
 echo ""
 echo "KB as primary long-term memory in Cursor: add the project rule to each repo's .cursor/rules:"
 echo "  mkdir -p .cursor/rules && ln -sf $RULE_HOME .cursor/rules/latadevin-kb-primary-memory.mdc"

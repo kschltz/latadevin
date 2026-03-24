@@ -39,7 +39,7 @@
    :kb/parent  {:db/valueType :db.type/string}
    :kb/links   {:db/valueType :db.type/ref :db/cardinality :db.cardinality/many}})
 
-(def max-note-chars 1000)
+(def max-entry-chars 250)
 
 (defn now [] (System/currentTimeMillis))
 
@@ -88,17 +88,26 @@
 
 ;; ── Validation ──────────────────────────────────────────────────────
 
-(defn validate-note-length!
-  "Reject note content that exceeds max-note-chars. Notes must be atomic."
+(defn fit-entry-content
+  "Clip s to max-entry-chars with ellipsis (for auto-generated placeholder text only)."
+  [s]
+  (let [n (count s)]
+    (if (<= n max-entry-chars) s
+      (str (subs s 0 (- max-entry-chars 3)) "..."))))
+
+(defn validate-entry-length!
+  "Reject entry content that exceeds max-entry-chars (abstract, summary, and note bodies)."
   [content]
   (let [len (count content)]
-    (when (> len max-note-chars)
-      (println (str "Error: note content is " len " characters (limit is " max-note-chars ")."))
+    (when (> len max-entry-chars)
+      (println (str "Error: content is " len " characters (limit is " max-entry-chars ")."))
       (println)
-      (println "Notes must be atomic — one idea, one fact, or one decision.")
-      (println "Break this into smaller notes linked with 'See also:' references:")
-      (println "  kb-store --parent \"<summary>\" \"topic/part-one\" \"First idea.\" tag1")
-      (println "  kb-store --parent \"<summary>\" \"topic/part-two\" \"Second idea. See also: topic/part-one\" tag1")
+      (println "Abstract, summary, and note bodies must stay within the limit.")
+      (println "Shorten the text or split notes under a summary; link with 'See also:' and tags.")
+      (println "  kb-abstract \"abstract/x\" \"Short blurb.\"")
+      (println "  kb-summary \"summary/x\" \"Short blurb.\" \"abstract/parent\"")
+      (println "  kb-store --parent \"summary/x\" \"topic/a\" \"One idea.\" tag1")
+      (println "  kb-store --parent \"summary/x\" \"topic/b\" \"See also: topic/a\" tag1")
       (System/exit 1))))
 
 ;; ── Link Parsing ─────────────────────────────────────────────────
@@ -272,7 +281,7 @@
             (when-not abstract-exists
               (println (str "Auto-creating missing abstract: " abstract-topic))
               (store-entry! conn abstract-topic
-                            (str "Auto-created abstract for " parent)
+                            (fit-entry-content (str "Auto-created abstract for " parent))
                             nil nil "abstract" nil))
             (store-entry! conn parent
                           (str "Auto-created summary (update with real description)")
@@ -286,7 +295,7 @@
                         nil nil "abstract" nil))))))
 
 (defn store-note! [topic content tags source parent & {:keys [create-parents]}]
-  (validate-note-length! content)
+  (validate-entry-length! content)
   (with-conn
     (fn [conn]
       (if create-parents
@@ -295,11 +304,13 @@
       (store-entry! conn topic content tags source "note" parent))))
 
 (defn store-abstract! [topic content]
+  (validate-entry-length! content)
   (with-conn
     (fn [conn]
       (store-entry! conn topic content nil nil "abstract" nil))))
 
 (defn store-summary! [topic content parent & {:keys [create-parents]}]
+  (validate-entry-length! content)
   (with-conn
     (fn [conn]
       (if create-parents
@@ -838,9 +849,9 @@
       (println "Latadevin Knowledge Base")
       (println)
       (println "Commands:")
-      (println "  store        --parent <summary> [--create-parents] <topic> <content> [tags...]  (content <= 1000 chars; split larger notes)")
-      (println "  abstract     <topic> <content>")
-      (println "  summary      [--create-parents] <topic> <content> <parent-abstract>")
+      (println (str "  store        --parent <summary> [--create-parents] <topic> <content> [tags...]  (content <= " max-entry-chars " chars)"))
+      (println (str "  abstract     <topic> <content>  (content <= " max-entry-chars " chars)"))
+      (println (str "  summary      [--create-parents] <topic> <content> <parent-abstract>  (content <= " max-entry-chars " chars)"))
       (println "  recall       <query>                                        Search topics, content, tags")
       (println "  recall-multi <word1> [word2...]                              Multi-keyword search")
       (println "  recall-with-context <word1> [word2...]                       Search with parent context")

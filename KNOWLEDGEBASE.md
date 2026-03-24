@@ -24,13 +24,13 @@ bb kb-drill "<topic>"         # Show entry and all its children (or parent conte
 ### Creating Entries
 
 ```bash
-# Create a top-level abstract
+# Create a top-level abstract (body <= 250 chars)
 bb kb-abstract "<topic>" "<content>"
 
-# Create a summary under an abstract
+# Create a summary under an abstract (body <= 250 chars)
 bb kb-summary "<topic>" "<content>" "<parent-abstract>"
 
-# Store a note under a summary (--parent is required; content must be <= 1000 chars)
+# Store a note under a summary (--parent is required; body <= 250 chars)
 bb kb-store --parent "<parent-summary>" "<topic>" "<content>" [tag1 tag2 ...]
 ```
 
@@ -65,11 +65,11 @@ The `--create-parents` flag also works with `kb-summary` to auto-create a missin
 
 Every note stored must follow these rules:
 
-### 0. Hard Size Limit: 1000 Characters
+### 0. Hard Size Limit: 250 Characters
 
-**Notes are hard-capped at 1000 characters.** The script will reject anything longer with an error.
+**Abstract, summary, and note bodies are hard-capped at 250 characters.** The script rejects longer `kb-abstract`, `kb-summary`, and `kb-store` content.
 
-If your content is too long, it **must** be split into smaller notes linked by `See also:` references and shared tags. There are no exceptions — a note that exceeds the limit is a note that should be two or more notes.
+If text is too long, split into additional abstracts/summaries/notes and link with `See also:` references and shared tags. There are no exceptions.
 
 ### 1. Atomic Notes
 
@@ -119,6 +119,7 @@ Context: <why this matters or when it applies>
 
 ```bash
 bb kb-recall "<search-query>"    # Search across topics, content, and tags
+bb kb-recall-multi <w1> [w2...]  # Several keywords in one invocation; merged, deduped results
 bb kb-get "<exact-topic-id>"     # Get a specific entry
 bb kb-list                       # List recent entries
 bb kb-list 50                    # List more
@@ -127,6 +128,8 @@ bb kb-tags                       # List all tags with counts
 bb kb-tree                       # Full hierarchy view
 bb kb-drill "<topic>"            # Drill into a topic and its children
 ```
+
+After install, the same commands exist as globals (`kb-recall`, `kb-recall-multi`, …). `kb-recall-multi` runs the same search as `kb-recall` per keyword and deduplicates by topic; the Claude Code `UserPromptSubmit` hook calls it with keywords extracted from your prompt.
 
 ## Removing Knowledge
 
@@ -159,7 +162,7 @@ Store a note when you encounter:
 - An external service detail (endpoint, quirk) — `ref/`
 - A deployment or operational procedure — `ops/` or `how/`
 
-**Split aggressively.** Notes are capped at 1000 characters — if you're writing "also" or "additionally", stop and split into two notes linked by tags and "See also:" references. The limit is enforced by the script and cannot be bypassed.
+**Split aggressively.** All entry bodies are capped at 250 characters — if you're writing "also" or "additionally", stop and split into two notes (or another summary) linked by tags and "See also:" references. The limit is enforced by the script and cannot be bypassed.
 
 When storing, always place the note under the most specific summary. If no summary fits, create one under the appropriate abstract. If no abstract fits, create one.
 

@@ -9,8 +9,8 @@ The **Latadevin / Datalevin knowledge base (KB)** is the agent’s **primary lon
 
 ## What to do
 
-- **Before non-trivial work**: run `kb-tree` and/or `kb-recall "<query>"` to load relevant context. Do not treat `sessionStart` snippets as sufficient recall—they are a small, recent sample.
-- **After meaningful progress**: persist non-obvious outcomes with `kb-store`, `kb-abstract`, or `kb-summary` as described in `KNOWLEDGEBASE.md`. Each note body ≤ 1000 characters; split larger material and link with `See also:`.
+- **Before non-trivial work**: run `kb-tree` and/or `kb-recall "<query>"` or `kb-recall-multi word1 word2` to load relevant context. `sessionStart` already runs `kb-recall-multi` on workspace folder name tokens (when they match the KB) plus a recent `kb list` sample—it is still not a substitute for explicit recall on your task.
+- **After meaningful progress**: persist non-obvious outcomes with `kb-store`, `kb-abstract`, or `kb-summary` as described in `KNOWLEDGEBASE.md`. Each abstract, summary, and note body ≤ 250 characters; split larger material and link with `See also:`.
 
 ## Commands and docs
 
@@ -18,4 +18,4 @@ Use global `kb-*` commands (see `AGENTS.md` and `KNOWLEDGEBASE.md`). Override DB
 
 ## Cursor-specific
 
-Cursor’s `sessionStart` hook only surfaces **recent** KB lines. For task-specific memory, **run `kb-recall` (or `kb-get`) yourself**—there is no per-prompt keyword injection like Claude Code’s `UserPromptSubmit`.
+Cursor’s `sessionStart` hook only surfaces **recent** KB lines. For task-specific memory, **run `kb-recall` or `kb-recall-multi` (or `kb-get`) yourself**—there is no per-prompt keyword injection like Claude Code’s `UserPromptSubmit` (which calls `kb-recall-multi` under the hood).

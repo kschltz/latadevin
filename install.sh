@@ -7,7 +7,7 @@ set -euo pipefail
 # Usage:
 #   ./install.sh              # Install for Claude Code (default)
 #   ./install.sh claude-code  # Same as above, explicit
-#   ./install.sh cursor       # Cursor (~/.cursor/hooks.json + sessionStart)
+#   ./install.sh cursor       # Cursor (~/.cursor/hooks.json + sessionStart: kb-recall-multi + kb list)
 #   ./install.sh <agent>      # Install for a specific agent
 
 AGENT="${1:-claude-code}"

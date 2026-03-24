@@ -16,7 +16,7 @@ integrations/
 | Agent | Directory | Notes |
 |-------|-----------|-------|
 | Claude Code | `claude-code/` | `UserPromptSubmit` hook for keyword auto-recall |
-| Cursor | `cursor/` | `sessionStart` hook injects recent entries; see `cursor/README.md` |
+| Cursor | `cursor/` | `sessionStart`: `kb-recall-multi` (workspace keywords) + `kb list`; see `cursor/README.md` |
 
 ## Adding a New Agent
 

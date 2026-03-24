@@ -196,6 +196,14 @@ Run this command using the Bash tool and display the output to the user:
 kb-recall "$ARGUMENTS"
 ```'
 
+install_slash_cmd "kb-recall-multi" 'Search the knowledge base with multiple keywords in one run (merged, deduped). Pass space-separated words after the command name.
+
+Run this command using the Bash tool and display the output to the user:
+
+```bash
+kb-recall-multi $ARGUMENTS
+```'
+
 install_slash_cmd "kb-get" 'Get a specific KB entry by its exact topic ID (e.g. "arch/my-decision").
 
 Run this command using the Bash tool and display the output to the user:
@@ -322,7 +330,7 @@ echo "  2. The auto-recall hook will search the KB on every prompt"
 echo "  3. Run 'kb-tree' to see your knowledge base (empty on first install)"
 echo ""
 echo "Global commands are available from any directory: kb-tree, kb-recall, kb-store, ..."
-echo "Claude Code slash commands: /kb-tree, /kb-recall, /kb-store, ..."
+echo "Claude Code slash commands: /kb-tree, /kb-recall, /kb-recall-multi, /kb-store, ..."
 echo ""
 echo "To use this KB as primary memory in any project:"
 echo "  Claude Code:   ln -s $KB_DIR/CLAUDE.md ./CLAUDE.md"
